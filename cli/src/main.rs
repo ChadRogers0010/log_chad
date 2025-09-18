@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use common::LogEntry;
 use reqwest::Client;
 
 #[derive(Parser)]
@@ -19,6 +20,9 @@ enum Commands {
 
     /// List logs from the server
     List,
+
+    /// Ping the server
+    Ping,
 }
 
 #[tokio::main]
@@ -49,8 +53,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let resp = client.get(format!("{}/logs", cli.api)).send().await?;
             let list: Vec<common::LogEntry> = resp.json().await?;
             for l in list {
-                println!("{} | {} {}", l.id, l.timestamp, l.message);
+                println!("{} | {} | {}", l.id, l.timestamp, l.message);
             }
+        }
+
+        Commands::Ping => {
+            let resp = client.get(format!("{}/ping", cli.api)).send().await?;
+            let ping_resp: LogEntry = resp.json().await?;
+            println!("{ping_resp:?}");
         }
     }
 

@@ -36,6 +36,7 @@ async fn main() {
         .route("/", get(root))
         .route("/logs", get(list_logs))
         .route("/logs", post(create_log))
+        .route("/ping", get(ping))
         .with_state(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
@@ -73,4 +74,14 @@ async fn list_logs(State(state): State<AppState>) -> impl IntoResponse {
     let logs = state.logs.read().await;
     let list = logs.clone();
     Json(list)
+}
+
+async fn ping() -> impl IntoResponse {
+    let resp = LogEntry {
+        id: Ulid::new().to_string(),
+        timestamp: Utc::now().to_rfc3339(),
+        message: String::from("Ping response from server!"),
+    };
+
+    (StatusCode::OK, Json(resp))
 }
