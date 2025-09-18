@@ -1,10 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LogEntry {
-    pub id: i64,
-    pub timestamp: u64,
-    pub level: String,
-    pub source: String,
+    pub id: String,
+    pub timestamp: String,
     pub message: String,
 }
