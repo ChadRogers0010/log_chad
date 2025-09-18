@@ -1,16 +1,48 @@
-use axum::{Router, routing::get};
+use axum::{
+    Router,
+    extract::{Json, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{get, post},
+};
+use chrono::Utc;
+use common::LogEntry;
 use std::net::SocketAddr;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing_subscriber;
+use ulid::Ulid;
+
+#[derive(Clone)]
+struct AppState {
+    logs: Arc<RwLock<Vec<LogEntry>>>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct CreateLog {
+    message: String,
+}
 
 #[tokio::main]
 async fn main() {
     // set up logging
     tracing_subscriber::fmt().with_env_filter("info").init();
 
-    let app = Router::new().route("/", get(root));
+    let state = AppState {
+        logs: Arc::new(RwLock::new(Vec::new())),
+    };
+
+    let app = Router::new()
+        .route("/", get(root))
+        .route("/logs", get(list_logs))
+        .route("/logs", post(create_log))
+        .with_state(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr)
+        .await
+        .expect("Bind failed: {addr}");
+
     tracing::info!("Server running on http://{addr}");
 
     axum::serve::serve(listener, app).await.unwrap();
@@ -18,4 +50,27 @@ async fn main() {
 
 async fn root() -> &'static str {
     "Hello from Chad Log API!"
+}
+
+async fn create_log(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateLog>,
+) -> impl IntoResponse {
+    let mut logs = state.logs.write().await;
+
+    let entry = LogEntry {
+        id: Ulid::new().to_string(),
+        message: payload.message,
+        timestamp: Utc::now().to_rfc3339(),
+    };
+
+    logs.push(entry.clone());
+
+    (StatusCode::CREATED, Json(entry))
+}
+
+async fn list_logs(State(state): State<AppState>) -> impl IntoResponse {
+    let logs = state.logs.read().await;
+    let list = logs.clone();
+    Json(list)
 }
