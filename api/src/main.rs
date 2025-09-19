@@ -13,14 +13,24 @@ use tokio::sync::RwLock;
 use tracing_subscriber;
 use ulid::Ulid;
 
+mod tests;
+
 #[derive(Clone)]
 struct AppState {
     logs: Arc<RwLock<Vec<LogEntry>>>,
 }
 
-#[derive(Debug, serde::Deserialize)]
-struct CreateLog {
-    message: String,
+fn app_builder() -> Router {
+    let state = AppState {
+        logs: Arc::new(RwLock::new(Vec::new())),
+    };
+
+    Router::new()
+        .route("/", get(root))
+        .route("/logs", get(list_logs))
+        .route("/logs", post(create_log))
+        .route("/ping", get(ping))
+        .with_state(state)
 }
 
 #[tokio::main]
@@ -28,16 +38,7 @@ async fn main() {
     // set up logging
     tracing_subscriber::fmt().with_env_filter("info").init();
 
-    let state = AppState {
-        logs: Arc::new(RwLock::new(Vec::new())),
-    };
-
-    let app = Router::new()
-        .route("/", get(root))
-        .route("/logs", get(list_logs))
-        .route("/logs", post(create_log))
-        .route("/ping", get(ping))
-        .with_state(state);
+    let app = app_builder();
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = tokio::net::TcpListener::bind(addr)
@@ -51,6 +52,11 @@ async fn main() {
 
 async fn root() -> &'static str {
     "Hello from Chad Log API!"
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct CreateLog {
+    message: String,
 }
 
 async fn create_log(
