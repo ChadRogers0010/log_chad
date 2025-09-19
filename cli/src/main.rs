@@ -36,7 +36,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             struct NewLog<'a> {
                 message: &'a str,
             }
-
             let body = NewLog { message: &message };
 
             let resp = client
