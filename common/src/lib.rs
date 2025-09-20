@@ -16,3 +16,11 @@ impl LogEntry {
         }
     }
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LogQuery {
+    pub after: Option<String>,
+    pub contains: Option<String>,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}

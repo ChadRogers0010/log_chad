@@ -1,10 +1,11 @@
+use axum::extract::Query;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use axum::{async_trait, extract::State};
-use chrono::Utc;
-use common::LogEntry;
+use chrono::{DateTime, Utc};
+use common::{LogEntry, LogQuery};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -88,10 +89,43 @@ async fn create_log<DB: LogStore>(
     (StatusCode::CREATED, Json(entry))
 }
 
-async fn list_logs<DB: LogStore>(State(state): State<AppState<DB>>) -> impl IntoResponse {
-    let logs = state.db.list_logs().await;
-    let list = logs.clone();
-    Json(list)
+async fn list_logs<DB: LogStore>(
+    State(state): State<AppState<DB>>,
+    Query(params): Query<LogQuery>,
+) -> impl IntoResponse {
+    let mut logs = state.db.list_logs().await;
+
+    if let Some(after_utc) = params
+        .after
+        .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+        .and_then(|after_dt| Some(after_dt.with_timezone(&Utc)))
+    {
+        logs.retain(|log| {
+            if let Ok(log_utc) =
+                DateTime::parse_from_rfc3339(&log.timestamp).and_then(|s| Ok(s.with_timezone(&Utc)))
+            {
+                log_utc > after_utc
+            } else {
+                false
+            }
+        });
+    }
+
+    if let Some(substr) = &params.contains {
+        logs.retain(|log| log.message.contains(substr));
+    }
+
+    logs.sort_by_key(|log| log.timestamp.clone());
+
+    let offset = params.offset.unwrap_or(0);
+    let limit = params.limit.unwrap_or(50);
+    let paginated = logs
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .collect::<Vec<LogEntry>>();
+
+    Json(paginated)
 }
 
 async fn ping() -> impl IntoResponse {

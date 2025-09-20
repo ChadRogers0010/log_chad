@@ -19,7 +19,19 @@ enum Commands {
     Send { message: String },
 
     /// List logs from the server
-    List,
+    List {
+        #[arg(long)]
+        after: Option<String>,
+
+        #[arg(long)]
+        contains: Option<String>,
+
+        #[arg(long)]
+        limit: Option<String>,
+
+        #[arg(long)]
+        offset: Option<String>,
+    },
 
     /// Ping the server
     Ping,
@@ -48,11 +60,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("Created: {:?}", created);
         }
 
-        Commands::List => {
-            let resp = client.get(format!("{}/logs", cli.api)).send().await?;
+        Commands::List {
+            after,
+            contains,
+            limit,
+            offset,
+        } => {
+            let mut url = format!("{}/logs?", cli.api);
+            let mut params = vec![];
+
+            if let Some(a) = after {
+                params.push(format!("after={a}"));
+            }
+
+            if let Some(c) = contains {
+                params.push(format!("contains={c}"));
+            }
+
+            if let Some(l) = limit {
+                params.push(format!("limit={l}"));
+            }
+
+            if let Some(o) = offset {
+                params.push(format!("offset={o}"));
+            }
+
+            url.push_str(&params.join("&"));
+
+            let resp = client.get(url).send().await?;
             let list: Vec<common::LogEntry> = resp.json().await?;
             for l in list {
-                println!("{} | {} | {}", l.id, l.timestamp, l.message);
+                println!("[{}] {}", l.timestamp, l.message);
             }
         }
 
