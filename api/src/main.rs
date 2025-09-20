@@ -95,26 +95,17 @@ async fn list_logs<DB: LogStore>(
 ) -> impl IntoResponse {
     let mut logs = state.db.list_logs().await;
 
-    if let Some(after_utc) = params
-        .after
-        .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
-        .and_then(|after_dt| Some(after_dt.with_timezone(&Utc)))
-    {
-        logs.retain(|log| {
-            if let Ok(log_utc) =
-                DateTime::parse_from_rfc3339(&log.timestamp).and_then(|s| Ok(s.with_timezone(&Utc)))
-            {
-                log_utc > after_utc
-            } else {
-                false
-            }
-        });
+    // Filter by time after
+    if let Some(after_utc) = params.after.as_deref().and_then(parse_utc) {
+        logs.retain(|log| matches_after(log, after_utc));
     }
 
+    // Filter by contains
     if let Some(substr) = &params.contains {
         logs.retain(|log| log.message.contains(substr));
     }
 
+    // Sort and paginate
     logs.sort_by_key(|log| log.timestamp.clone());
 
     let offset = params.offset.unwrap_or(0);
@@ -126,6 +117,18 @@ async fn list_logs<DB: LogStore>(
         .collect::<Vec<LogEntry>>();
 
     Json(paginated)
+}
+
+fn parse_utc(s: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(&s)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
+}
+
+fn matches_after(log: &LogEntry, after: DateTime<Utc>) -> bool {
+    parse_utc(&log.timestamp)
+        .map(|log_dt| log_dt > after)
+        .unwrap_or(false)
 }
 
 async fn ping() -> impl IntoResponse {
