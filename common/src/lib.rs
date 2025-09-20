@@ -10,9 +10,9 @@ pub struct LogEntry {
 impl LogEntry {
     pub fn new(message: String) -> Self {
         Self {
-            message,
             id: ulid::Ulid::new().to_string(),
             timestamp: chrono::Utc::now().to_rfc3339(),
+            message,
         }
     }
 }
