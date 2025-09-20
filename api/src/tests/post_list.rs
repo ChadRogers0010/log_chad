@@ -1,6 +1,6 @@
 #[tokio::test]
 async fn create_and_list_logs() {
-    use crate::InMemoryStore;
+    use crate::{AppState, InMemoryStore, app_builder};
     use axum::{
         body::Body,
         http::{Request, StatusCode},
@@ -10,7 +10,10 @@ async fn create_and_list_logs() {
     use tower::ServiceExt; // for `oneshot`
     // Arrange: create in-memory DB and config
 
-    let app = crate::app_builder(InMemoryStore::default());
+    let state = AppState {
+        db: InMemoryStore::default(),
+    };
+    let app = app_builder(state);
 
     // Act: POST /logs twice
     let body1 = json!({ "message": "First log entry" });

@@ -36,9 +36,7 @@ struct AppState<DB: LogStore> {
     pub db: DB,
 }
 
-fn app_builder<DB: LogStore>(db: DB) -> Router {
-    let state = AppState { db };
-
+fn app_builder<DB: LogStore>(state: AppState<DB>) -> Router {
     Router::<AppState<DB>>::new()
         .route("/", get(root))
         .route("/ping", get(ping))
@@ -52,8 +50,10 @@ async fn main() {
     // set up logging
     tracing_subscriber::fmt().with_env_filter("info").init();
 
-    let database = InMemoryStore::default();
-    let app = app_builder(database);
+    let state = AppState {
+        db: InMemoryStore::default(),
+    };
+    let app = app_builder(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = tokio::net::TcpListener::bind(addr)
