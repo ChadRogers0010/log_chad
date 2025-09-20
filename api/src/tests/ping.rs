@@ -1,6 +1,7 @@
 #[tokio::test]
 async fn ping_returns_expected_json() {
     use super::super::app_builder;
+    use crate::InMemoryStore;
     use axum::{body::Body, http};
     use http::{Request, StatusCode};
     use serde_json::Value;
@@ -9,7 +10,7 @@ async fn ping_returns_expected_json() {
 
     // for `oneshot`
     // Arrange: build app with fresh state
-    let app = app_builder();
+    let app = app_builder(InMemoryStore::default());
 
     // Act: send GET /ping to the app
     let response = app
