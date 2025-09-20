@@ -1,6 +1,6 @@
 #[tokio::test]
 async fn create_and_list_logs() {
-    use crate::{AppState, InMemoryStore, app_builder};
+    use crate::{AppState, InMemoryStore, app_builder, config::Config};
     use axum::{
         body::Body,
         http::{Request, StatusCode},
@@ -12,6 +12,7 @@ async fn create_and_list_logs() {
 
     let state = AppState {
         db: InMemoryStore::default(),
+        cfg: Config::default(),
     };
     let app = app_builder(state);
 

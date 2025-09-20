@@ -1,5 +1,0 @@
-cargo run -p cli send "Foo"
-cargo run -p cli send "FooBar"
-cargo run -p cli send "FooBarBaz"
-cargo run -p cli send "Quox"
-cargo run -p cli list --contains "Foo"

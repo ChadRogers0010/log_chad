@@ -6,12 +6,14 @@ use axum::{Json, Router};
 use axum::{async_trait, extract::State};
 use chrono::{DateTime, Utc};
 use common::{LogEntry, LogQuery};
+use config::Config;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing_subscriber;
 use ulid::Ulid;
 
+mod config;
 mod tests;
 
 #[derive(Clone, Default)]
@@ -34,6 +36,7 @@ impl LogStore for InMemoryStore {
 #[derive(Clone)]
 struct AppState<DB: LogStore> {
     pub db: DB,
+    pub cfg: config::Config,
 }
 
 fn app_builder<DB: LogStore>(state: AppState<DB>) -> Router {
@@ -47,15 +50,17 @@ fn app_builder<DB: LogStore>(state: AppState<DB>) -> Router {
 
 #[tokio::main]
 async fn main() {
+    let cfg = Config::from_env().expect("Failed to load configuration");
     // set up logging
     tracing_subscriber::fmt().with_env_filter("info").init();
 
     let state = AppState {
         db: InMemoryStore::default(),
+        cfg: cfg.clone(),
     };
     let app = app_builder(state);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from((cfg.address, cfg.port));
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("Bind failed: {addr}");
