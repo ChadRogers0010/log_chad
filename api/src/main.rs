@@ -31,8 +31,12 @@ impl LogStore for InMemoryStore {
         self.logs.write().await.push(entry.clone());
         entry
     }
+    async fn count(&self) -> usize {
+        self.logs.read().await.len()
+    }
 }
 
+#[allow(unused)]
 #[derive(Clone)]
 struct AppState<DB: LogStore> {
     pub db: DB,
@@ -45,9 +49,9 @@ fn app_builder<DB: LogStore>(state: AppState<DB>) -> Router {
         .route("/ping", get(ping))
         .route("/logs", post(create_log))
         .route("/logs", get(list_logs))
+        .route("/logs/count", get(count_logs))
         .with_state(state)
 }
-
 #[tokio::main]
 async fn main() {
     let cfg = Config::from_env().expect("Failed to load configuration");
@@ -74,6 +78,7 @@ async fn main() {
 trait LogStore: Clone + Send + Sync + 'static {
     async fn list_logs(&self) -> Vec<LogEntry>;
     async fn add_log(&self, entry: String) -> LogEntry;
+    async fn count(&self) -> usize;
 }
 
 async fn root() -> &'static str {
@@ -134,6 +139,14 @@ fn matches_after(log: &LogEntry, after: DateTime<Utc>) -> bool {
     parse_utc(&log.timestamp)
         .map(|log_dt| log_dt > after)
         .unwrap_or(false)
+}
+
+async fn count_logs<DB: LogStore>(State(state): State<AppState<DB>>) -> impl IntoResponse {
+    let count = state.db.count().await;
+
+    let count_response = LogEntry::new(format!("Count: {count}"));
+
+    Json(count_response)
 }
 
 async fn ping() -> impl IntoResponse {

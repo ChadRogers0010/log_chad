@@ -33,6 +33,9 @@ enum Commands {
         offset: Option<String>,
     },
 
+    /// Number of elements in logs
+    Count,
+
     /// Ping the server
     Ping,
 }
@@ -50,14 +53,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             let body = NewLog { message: &message };
 
-            let resp = client
+            let _resp = client
                 .post(format!("{}/logs", cli.api))
                 .json(&body)
                 .send()
                 .await?;
-
-            let created: common::LogEntry = resp.json().await?;
-            println!("Created: {:?}", created);
         }
 
         Commands::List {
@@ -92,6 +92,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             for l in list {
                 println!("[{}] {}", l.timestamp, l.message);
             }
+        }
+
+        Commands::Count => {
+            let resp = client.get(format!("{}/logs/count", cli.api)).send().await?;
+            let count_resp: LogEntry = resp.json().await?;
+            println!("{count_resp:?}");
         }
 
         Commands::Ping => {
