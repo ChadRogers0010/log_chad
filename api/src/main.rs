@@ -1,10 +1,8 @@
-use axum::{
-    Router,
-    extract::{Json, State},
-    http::StatusCode,
-    response::IntoResponse,
-    routing::{get, post},
-};
+use axum::http::StatusCode;
+use axum::response::IntoResponse;
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use axum::{async_trait, extract::State};
 use chrono::Utc;
 use common::LogEntry;
 use std::net::SocketAddr;
@@ -15,21 +13,36 @@ use ulid::Ulid;
 
 mod tests;
 
-#[derive(Clone)]
-struct AppState {
+#[derive(Clone, Default)]
+struct InMemoryStore {
     logs: Arc<RwLock<Vec<LogEntry>>>,
 }
+#[async_trait]
+impl LogStore for InMemoryStore {
+    async fn list_logs(&self) -> Vec<LogEntry> {
+        self.logs.read().await.clone()
+    }
 
-fn app_builder() -> Router {
-    let state = AppState {
-        logs: Arc::new(RwLock::new(Vec::new())),
-    };
+    async fn add_log(&self, message: String) -> LogEntry {
+        let entry = LogEntry::new(message);
+        self.logs.write().await.push(entry.clone());
+        entry
+    }
+}
 
-    Router::new()
+#[derive(Clone)]
+struct AppState<DB: LogStore> {
+    pub db: DB,
+}
+
+fn app_builder<DB: LogStore>(db: DB) -> Router {
+    let state = AppState { db };
+
+    Router::<AppState<DB>>::new()
         .route("/", get(root))
-        .route("/logs", get(list_logs))
-        .route("/logs", post(create_log))
         .route("/ping", get(ping))
+        .route("/logs", post(create_log))
+        .route("/logs", get(list_logs))
         .with_state(state)
 }
 
@@ -38,7 +51,8 @@ async fn main() {
     // set up logging
     tracing_subscriber::fmt().with_env_filter("info").init();
 
-    let app = app_builder();
+    let database = InMemoryStore::default();
+    let app = app_builder(database);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let listener = tokio::net::TcpListener::bind(addr)
@@ -50,6 +64,12 @@ async fn main() {
     axum::serve::serve(listener, app).await.unwrap();
 }
 
+#[async_trait]
+trait LogStore: Clone + Send + Sync + 'static {
+    async fn list_logs(&self) -> Vec<LogEntry>;
+    async fn add_log(&self, entry: String) -> LogEntry;
+}
+
 async fn root() -> &'static str {
     "Hello from Chad Log API!"
 }
@@ -59,25 +79,17 @@ struct CreateLog {
     message: String,
 }
 
-async fn create_log(
-    State(state): State<AppState>,
+async fn create_log<DB: LogStore>(
+    State(state): State<AppState<DB>>,
     Json(payload): Json<CreateLog>,
 ) -> impl IntoResponse {
-    let mut logs = state.logs.write().await;
-
-    let entry = LogEntry {
-        id: Ulid::new().to_string(),
-        message: payload.message,
-        timestamp: Utc::now().to_rfc3339(),
-    };
-
-    logs.push(entry.clone());
+    let entry = state.db.add_log(payload.message).await;
 
     (StatusCode::CREATED, Json(entry))
 }
 
-async fn list_logs(State(state): State<AppState>) -> impl IntoResponse {
-    let logs = state.logs.read().await;
+async fn list_logs<DB: LogStore>(State(state): State<AppState<DB>>) -> impl IntoResponse {
+    let logs = state.db.list_logs().await;
     let list = logs.clone();
     Json(list)
 }
