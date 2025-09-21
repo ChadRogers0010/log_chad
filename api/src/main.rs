@@ -6,9 +6,7 @@ use axum::{Json, Router};
 use axum::{async_trait, extract::State};
 use chrono::{DateTime, Utc};
 use common::{LogEntry, LogQuery};
-use config::Config;
 use std::net::SocketAddr;
-use tracing_subscriber;
 use ulid::Ulid;
 
 mod config;
@@ -35,7 +33,7 @@ fn app_builder<DB: LogStore>(state: AppState<DB>) -> Router {
 
 #[tokio::main]
 async fn main() {
-    let cfg = Config::from_env().expect("Failed to load configuration");
+    let cfg = config::Config::from_env().expect("Failed to load configuration");
     // set up logging
     tracing_subscriber::fmt().with_env_filter("info").init();
 
