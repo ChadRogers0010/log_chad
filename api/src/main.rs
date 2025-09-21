@@ -5,14 +5,15 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use axum::{async_trait, extract::State};
 use chrono::{DateTime, Utc};
-use common::{LogEntry, LogQuery};
 use std::net::SocketAddr;
 use ulid::Ulid;
+
+use common::{LogEntry, LogQuery};
+use in_memory_store::*;
 
 mod config;
 mod in_memory_store;
 mod tests;
-use in_memory_store::*;
 
 #[allow(unused)]
 #[derive(Clone)]
