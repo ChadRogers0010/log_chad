@@ -4,7 +4,6 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use axum::{async_trait, extract::State};
-use chrono::{DateTime, Utc};
 use std::net::SocketAddr;
 use ulid::Ulid;
 
@@ -14,6 +13,7 @@ use in_memory_store::*;
 mod config;
 mod in_memory_store;
 mod tests;
+mod utils;
 
 #[allow(unused)]
 #[derive(Clone)]
@@ -86,8 +86,8 @@ async fn list_logs<DB: LogStore>(
     let mut logs = state.db.list_logs().await;
 
     // Filter by time after
-    if let Some(after_utc) = params.after.as_deref().and_then(parse_utc) {
-        logs.retain(|log| matches_after(log, after_utc));
+    if let Some(after_utc) = params.after.as_deref().and_then(utils::parse_utc) {
+        logs.retain(|log| utils::matches_after(log, after_utc));
     }
 
     // Filter by contains
@@ -109,18 +109,6 @@ async fn list_logs<DB: LogStore>(
     Json(paginated)
 }
 
-fn parse_utc(s: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(&s)
-        .ok()
-        .map(|dt| dt.with_timezone(&Utc))
-}
-
-fn matches_after(log: &LogEntry, after: DateTime<Utc>) -> bool {
-    parse_utc(&log.timestamp)
-        .map(|log_dt| log_dt > after)
-        .unwrap_or(false)
-}
-
 async fn count_logs<DB: LogStore>(State(state): State<AppState<DB>>) -> impl IntoResponse {
     let count = state.db.count().await;
 
@@ -132,7 +120,7 @@ async fn count_logs<DB: LogStore>(State(state): State<AppState<DB>>) -> impl Int
 async fn ping() -> impl IntoResponse {
     let resp = LogEntry {
         id: Ulid::new().to_string(),
-        timestamp: Utc::now().to_rfc3339(),
+        timestamp: chrono::Utc::now().to_rfc3339(),
         message: String::from("Ping response from server!"),
     };
 
