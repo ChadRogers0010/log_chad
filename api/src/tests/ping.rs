@@ -11,7 +11,7 @@ async fn ping_returns_expected_json() {
     // Arrange: build app with fresh state
     let state = AppState {
         db: InMemoryStore::default(),
-        cfg: Config::default(),
+        cfg: Config::_default(),
     };
     let app = app_builder(state);
 

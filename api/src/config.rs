@@ -25,7 +25,7 @@ impl Config {
         builder.build()?.try_deserialize()
     }
 
-    pub fn default() -> Self {
+    pub fn _default() -> Self {
         Self {
             address: Ipv4Addr::new(127, 0, 0, 1),
             port: 3000u16,
