@@ -14,23 +14,6 @@ mod in_memory_store;
 mod tests;
 mod utils;
 
-#[allow(unused)]
-#[derive(Clone)]
-struct AppState<DB: LogStore> {
-    pub db: DB,
-    pub cfg: config::Config,
-}
-
-fn app_builder<DB: LogStore>(state: AppState<DB>) -> Router {
-    Router::<AppState<DB>>::new()
-        .route("/", get(root))
-        .route("/ping", get(ping))
-        .route("/logs", post(create_log))
-        .route("/logs", get(list_logs))
-        .route("/logs/count", get(count_logs))
-        .with_state(state)
-}
-
 #[tokio::main]
 async fn main() {
     let cfg = config::Config::from_env().expect("Failed to load configuration");
@@ -53,11 +36,28 @@ async fn main() {
     axum::serve::serve(listener, app).await.unwrap();
 }
 
+#[allow(unused)]
+#[derive(Clone)]
+struct AppState<DB: LogStore> {
+    pub db: DB,
+    pub cfg: config::Config,
+}
+
 #[async_trait]
 trait LogStore: Clone + Send + Sync + 'static {
     async fn list_logs(&self) -> Vec<LogEntry>;
     async fn add_log(&self, entry: String) -> LogEntry;
     async fn count(&self) -> usize;
+}
+
+fn app_builder<DB: LogStore>(state: AppState<DB>) -> Router {
+    Router::<AppState<DB>>::new()
+        .route("/", get(root))
+        .route("/ping", get(ping))
+        .route("/logs", post(create_log))
+        .route("/logs", get(list_logs))
+        .route("/logs/count", get(count_logs))
+        .with_state(state)
 }
 
 async fn root() -> &'static str {
