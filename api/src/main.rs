@@ -8,33 +8,13 @@ use chrono::{DateTime, Utc};
 use common::{LogEntry, LogQuery};
 use config::Config;
 use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing_subscriber;
 use ulid::Ulid;
 
 mod config;
+mod in_memory_store;
 mod tests;
-
-#[derive(Clone, Default)]
-struct InMemoryStore {
-    logs: Arc<RwLock<Vec<LogEntry>>>,
-}
-#[async_trait]
-impl LogStore for InMemoryStore {
-    async fn list_logs(&self) -> Vec<LogEntry> {
-        self.logs.read().await.clone()
-    }
-
-    async fn add_log(&self, message: String) -> LogEntry {
-        let entry = LogEntry::new(message);
-        self.logs.write().await.push(entry.clone());
-        entry
-    }
-    async fn count(&self) -> usize {
-        self.logs.read().await.len()
-    }
-}
+use in_memory_store::*;
 
 #[allow(unused)]
 #[derive(Clone)]
@@ -52,6 +32,7 @@ fn app_builder<DB: LogStore>(state: AppState<DB>) -> Router {
         .route("/logs/count", get(count_logs))
         .with_state(state)
 }
+
 #[tokio::main]
 async fn main() {
     let cfg = Config::from_env().expect("Failed to load configuration");
