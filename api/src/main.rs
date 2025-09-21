@@ -18,7 +18,9 @@ mod utils;
 async fn main() {
     let cfg = config::Config::from_env().expect("Failed to load configuration");
     // set up logging
-    tracing_subscriber::fmt().with_env_filter("info").init();
+    tracing_subscriber::fmt()
+        .with_env_filter(cfg.log_level.clone())
+        .init();
 
     let state = AppState {
         db: InMemoryStore::default(),
