@@ -5,7 +5,6 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use axum::{async_trait, extract::State};
 use std::net::SocketAddr;
-use ulid::Ulid;
 
 use common::{LogEntry, LogQuery};
 use in_memory_store::*;
@@ -118,11 +117,7 @@ async fn count_logs<DB: LogStore>(State(state): State<AppState<DB>>) -> impl Int
 }
 
 async fn ping() -> impl IntoResponse {
-    let resp = LogEntry {
-        id: Ulid::new().to_string(),
-        timestamp: chrono::Utc::now().to_rfc3339(),
-        message: String::from("Ping response from server!"),
-    };
+    let resp = LogEntry::new(String::from("Ping response from server!"));
 
     (StatusCode::OK, Json(resp))
 }
