@@ -11,8 +11,11 @@ use in_memory_store::*;
 
 mod config;
 mod in_memory_store;
+mod pg_store;
 mod tests;
 mod utils;
+
+pub use pg_store::*;
 
 #[tokio::main]
 async fn main() {
@@ -47,9 +50,9 @@ struct AppState<DB: LogStore> {
 
 #[async_trait]
 trait LogStore: Clone + Send + Sync + 'static {
-    async fn list_logs(&self) -> Vec<LogEntry>;
-    async fn add_log(&self, entry: String) -> LogEntry;
-    async fn count(&self) -> usize;
+    async fn list_logs(&self) -> anyhow::Result<Vec<LogEntry>>;
+    async fn add_log(&self, entry: String) -> anyhow::Result<LogEntry>;
+    async fn count(&self) -> anyhow::Result<usize>;
 }
 
 fn app_builder<DB: LogStore>(state: AppState<DB>) -> Router {
@@ -77,14 +80,30 @@ async fn create_log<DB: LogStore>(
 ) -> impl IntoResponse {
     let entry = state.db.add_log(payload.message).await;
 
-    (StatusCode::CREATED, Json(entry))
+    match entry {
+        Ok(ok) => (StatusCode::CREATED, Json(ok)),
+
+        Err(err) => {
+            tracing::error!("App error: {err}");
+            (StatusCode::BAD_REQUEST, Json(LogEntry::new(0.to_string())))
+        }
+    }
 }
 
 async fn list_logs<DB: LogStore>(
     State(state): State<AppState<DB>>,
     Query(params): Query<LogQuery>,
 ) -> impl IntoResponse {
-    let mut logs = state.db.list_logs().await;
+    let mut logs = match state.db.list_logs().await {
+        Ok(ok) => ok,
+        Err(err) => {
+            tracing::error!("App error: {err}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(vec![LogEntry::new("0".to_string())]),
+            );
+        }
+    };
 
     // Filter by time after
     if let Some(after_utc) = params.after.as_deref().and_then(utils::parse_utc) {
@@ -107,15 +126,24 @@ async fn list_logs<DB: LogStore>(
         .take(limit)
         .collect::<Vec<LogEntry>>();
 
-    Json(paginated)
+    (StatusCode::OK, Json(paginated))
 }
 
 async fn count_logs<DB: LogStore>(State(state): State<AppState<DB>>) -> impl IntoResponse {
-    let count = state.db.count().await;
+    let count = match state.db.count().await {
+        Ok(ok) => ok,
+        Err(err) => {
+            tracing::error!("App error: {err}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(LogEntry::new("Failed to count logs".to_string())),
+            );
+        }
+    };
 
     let count_response = LogEntry::new(format!("Count: {count}"));
 
-    Json(count_response)
+    (StatusCode::OK, Json(count_response))
 }
 
 async fn ping() -> impl IntoResponse {
