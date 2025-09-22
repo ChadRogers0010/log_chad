@@ -43,6 +43,4 @@ jobs:
           cargo sqlx prepare --workspace -- --all-targets
 
       - name: Run Tests (Offline Mode)
-        env:
-          # SQLX_OFFLINE: true
         run: cargo test --workspace --all-features
