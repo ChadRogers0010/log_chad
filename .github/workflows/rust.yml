@@ -1,6 +1,15 @@
+name: Rust CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    environment: db_test  # 👈 This tells GitHub to pull from your "db_test" environment
     services:
       postgres:
         image: postgres:15
@@ -20,21 +29,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Set Defaults (when secrets not defined)
-        run: |
-          : "${DB_USER:=chad}"
-          : "${DB_PASS:=secret}"
-          : "${DB_NAME:=chad_log}"
-          echo "DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}" >> $GITHUB_ENV
+
       - name: Install SQLx CLI
         run: cargo install sqlx-cli --no-default-features --features postgres
+
       - name: Prepare Database
         run: |
           sqlx database create
           sqlx migrate run
           cargo sqlx prepare --workspace -- --all-targets
+
       - name: Run Tests (Offline Mode)
         env:
           SQLX_OFFLINE: true
