@@ -7,11 +7,13 @@ async fn create_and_list_logs() {
     };
     use common::LogEntry;
     use serde_json::json;
+    use std::sync::Arc;
     use tower::ServiceExt; // for `oneshot`
     // Arrange: create in-memory DB and config
 
+    let db = InMemoryStore::default();
     let state = AppState {
-        db: InMemoryStore::default(),
+        db: Arc::new(db),
         cfg: Config::_default(),
     };
     let app = app_builder(state);

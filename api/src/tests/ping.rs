@@ -4,18 +4,17 @@ async fn ping_returns_expected_json() {
     use axum::{body::Body, http};
     use http::{Request, StatusCode};
     use serde_json::Value;
+    use std::sync::Arc;
     use std::usize;
     use tower::ServiceExt;
 
-    // for `oneshot`
-    // Arrange: build app with fresh state
+    let db = InMemoryStore::default();
     let state = AppState {
-        db: InMemoryStore::default(),
+        db: Arc::new(db),
         cfg: Config::_default(),
     };
     let app = app_builder(state);
 
-    // Act: send GET /ping to the app
     let response = app
         .oneshot(
             Request::builder()
@@ -27,7 +26,6 @@ async fn ping_returns_expected_json() {
         .await
         .unwrap();
 
-    // Assert: check status and body
     assert_eq!(response.status(), StatusCode::OK);
 
     let body_bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
