@@ -6,22 +6,28 @@ jobs:
         image: postgres:15
         ports: ["5432:5432"]
         env:
-          POSTGRES_USER: ${{ secrets.DB_USER || 'chad' }}
-          POSTGRES_PASSWORD: ${{ secrets.DB_PASS || 'secret' }}
-          POSTGRES_DB: ${{ secrets.DB_NAME || 'chad_log' }}
+          POSTGRES_USER: ${{ secrets.DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASS }}
+          POSTGRES_DB: ${{ secrets.DB_NAME }}
         options: >-
-          --health-cmd="pg_isready -U ${{ secrets.DB_USER || 'chad' }}"
+          --health-cmd="pg_isready -U ${{ secrets.DB_USER }}"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     env:
-      DATABASE_URL: postgres://${{ secrets.DB_USER || 'chad' }}:${{ secrets.DB_PASS || 'secret' }}@localhost:5432/${{ secrets.DB_NAME || 'chad_log' }}
+      DATABASE_URL: postgres://${{ secrets.DB_USER }}:${{ secrets.DB_PASS }}@localhost:5432/${{ secrets.DB_NAME }}
 
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: Set Defaults (when secrets not defined)
+        run: |
+          : "${DB_USER:=chad}"
+          : "${DB_PASS:=secret}"
+          : "${DB_NAME:=chad_log}"
+          echo "DATABASE_URL=postgres://${DB_USER}:${DB_PASS}@localhost:5432/${DB_NAME}" >> $GITHUB_ENV
       - name: Install SQLx CLI
         run: cargo install sqlx-cli --no-default-features --features postgres
       - name: Prepare Database
