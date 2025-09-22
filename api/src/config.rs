@@ -6,6 +6,7 @@ use std::net::Ipv4Addr;
 pub struct Config {
     pub address: Ipv4Addr,
     pub port: u16,
+    pub database_url: Option<String>,
     pub log_level: String,
     pub api_key: Option<String>,
 }
@@ -17,9 +18,11 @@ impl Config {
         let builder = config::Config::builder()
             .set_default("ADDRESS", "127.0.0.1")?
             .set_default("PORT", 3000u16)?
+            .set_default("DATABASE_URL", Option::<String>::None)?
             .set_default("LOG_LEVEL", "info")?
             .set_default("api_key", "supersecretcode")?
             .add_source(config::File::with_name("config").required(false))
+            .add_source(config::Environment::default())
             .add_source(config::Environment::with_prefix("CHAD_LOG").separator("__"));
 
         builder.build()?.try_deserialize()
@@ -29,6 +32,7 @@ impl Config {
         Self {
             address: Ipv4Addr::new(127, 0, 0, 1),
             port: 3000u16,
+            database_url: None,
             log_level: String::from("info"),
             api_key: Some(String::from("supersecretcode")),
         }
