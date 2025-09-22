@@ -5,6 +5,7 @@ use axum::routing::{get, post};
 use axum::{Json, Router};
 use axum::{async_trait, extract::State};
 use std::net::SocketAddr;
+use std::sync::Arc;
 
 use common::{LogEntry, LogQuery};
 use in_memory_store::*;
@@ -20,13 +21,22 @@ pub use pg_store::*;
 #[tokio::main]
 async fn main() {
     let cfg = config::Config::from_env().expect("Failed to load configuration");
+
     // set up logging
     tracing_subscriber::fmt()
         .with_env_filter(cfg.log_level.clone())
         .init();
 
+    let db: Arc<dyn LogStore> = if let Some(url) = &cfg.database_url {
+        tracing::info!("Using {url}");
+        Arc::new(PgStore::new(url).await.unwrap())
+    } else {
+        tracing::info!("Using InMemoryStore db");
+        Arc::new(InMemoryStore::new())
+    };
+
     let state = AppState {
-        db: InMemoryStore::default(),
+        db,
         cfg: cfg.clone(),
     };
     let app = app_builder(state);
@@ -43,20 +53,20 @@ async fn main() {
 
 #[allow(unused)]
 #[derive(Clone)]
-struct AppState<DB: LogStore> {
-    pub db: DB,
+struct AppState {
+    pub db: Arc<dyn LogStore>,
     pub cfg: config::Config,
 }
 
 #[async_trait]
-trait LogStore: Clone + Send + Sync + 'static {
+trait LogStore: Send + Sync + 'static {
     async fn list_logs(&self) -> anyhow::Result<Vec<LogEntry>>;
     async fn add_log(&self, entry: String) -> anyhow::Result<LogEntry>;
     async fn count(&self) -> anyhow::Result<usize>;
 }
 
-fn app_builder<DB: LogStore>(state: AppState<DB>) -> Router {
-    Router::<AppState<DB>>::new()
+fn app_builder(state: AppState) -> Router {
+    Router::<AppState>::new()
         .route("/", get(root))
         .route("/ping", get(ping))
         .route("/logs", post(create_log))
@@ -74,11 +84,13 @@ struct CreateLog {
     message: String,
 }
 
-async fn create_log<DB: LogStore>(
-    State(state): State<AppState<DB>>,
+async fn create_log(
+    State(state): State<AppState>,
     Json(payload): Json<CreateLog>,
 ) -> impl IntoResponse {
     let entry = state.db.add_log(payload.message).await;
+
+    tracing::info!("add_log: {entry:?}");
 
     match entry {
         Ok(ok) => (StatusCode::CREATED, Json(ok)),
@@ -90,8 +102,8 @@ async fn create_log<DB: LogStore>(
     }
 }
 
-async fn list_logs<DB: LogStore>(
-    State(state): State<AppState<DB>>,
+async fn list_logs(
+    State(state): State<AppState>,
     Query(params): Query<LogQuery>,
 ) -> impl IntoResponse {
     let mut logs = match state.db.list_logs().await {
@@ -129,7 +141,7 @@ async fn list_logs<DB: LogStore>(
     (StatusCode::OK, Json(paginated))
 }
 
-async fn count_logs<DB: LogStore>(State(state): State<AppState<DB>>) -> impl IntoResponse {
+async fn count_logs(State(state): State<AppState>) -> impl IntoResponse {
     let count = match state.db.count().await {
         Ok(ok) => ok,
         Err(err) => {
