@@ -1,22 +1,35 @@
-name: Rust
-
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
-  build:
-
+  test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        ports: ["5432:5432"]
+        env:
+          POSTGRES_USER: ${{ secrets.DB_USER || 'chad' }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASS || 'secret' }}
+          POSTGRES_DB: ${{ secrets.DB_NAME || 'chad_log' }}
+        options: >-
+          --health-cmd="pg_isready -U ${{ secrets.DB_USER || 'chad' }}"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL: postgres://${{ secrets.DB_USER || 'chad' }}:${{ secrets.DB_PASS || 'secret' }}@localhost:5432/${{ secrets.DB_NAME || 'chad_log' }}
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --all --verbose
-    - name: Run tests
-      run: cargo test --all --verbose
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --no-default-features --features postgres
+      - name: Prepare Database
+        run: |
+          sqlx database create
+          sqlx migrate run
+          cargo sqlx prepare --workspace -- --all-targets
+      - name: Run Tests (Offline Mode)
+        env:
+          SQLX_OFFLINE: true
+        run: cargo test --workspace --all-features
