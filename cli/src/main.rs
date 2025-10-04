@@ -40,6 +40,7 @@ enum Commands {
     Ping,
 }
 
+// Logging server
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
