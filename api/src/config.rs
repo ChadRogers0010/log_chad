@@ -1,5 +1,5 @@
 use serde::Deserialize;
-use std::net::Ipv4Addr;
+use std::{iter::zip, net::Ipv4Addr};
 
 #[allow(unused)]
 #[derive(Clone, Debug, Deserialize)]
