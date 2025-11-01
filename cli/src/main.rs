@@ -40,9 +40,6 @@ enum Commands {
     Ping,
 }
 
-// Logging server
-// This is a simple REST API server that can send
-// and receive logs from a CLI client to a database
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();

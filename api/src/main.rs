@@ -18,6 +18,9 @@ mod utils;
 
 pub use pg_store::*;
 
+// Logging server
+// This is a simple REST API server that can send
+// and receive logs from a CLI client to a database
 #[tokio::main]
 async fn main() {
     let cfg = config::Config::from_env().expect("Failed to load configuration");
